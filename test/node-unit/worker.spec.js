@@ -67,7 +67,7 @@ describe('worker', function() {
         '../../lib/mocha': stubs.Mocha,
         '../../lib/nodejs/serializer': stubs.serializer,
         '../../lib/cli/run-helpers': stubs.runHelpers,
-        '../../lib/plugin': stubs.plugin
+        '../../lib/plugin-loader': stubs.plugin
       });
     });
 

@@ -1,19 +1,14 @@
 'use strict';
 
-const rewiremock = require('rewiremock/node');
+const PluginLoader = require('../../lib/plugin-loader');
 const sinon = require('sinon');
+const {
+  INVALID_PLUGIN_DEFINITION,
+  INVALID_PLUGIN_IMPLEMENTATION
+} = require('../../lib/errors').constants;
 
 describe('plugin module', function() {
   describe('class PluginLoader', function() {
-    /**
-     * @type {import('../../lib/plugin').PluginLoader}
-     */
-    let PluginLoader;
-
-    beforeEach(function() {
-      PluginLoader = rewiremock.proxy('../../lib/plugin', {}).PluginLoader;
-    });
-
     describe('constructor', function() {
       describe('when passed no options', function() {
         it('should populate a registry of built-in plugins', function() {
@@ -60,13 +55,43 @@ describe('plugin module', function() {
 
         describe('when the plugin export name is already in use', function() {
           it('should throw', function() {
-            expect(
-              () => pluginLoader.register({exportName: 'mochaHooks'}),
-              'to throw'
-            );
+            const pluginDef = {exportName: 'butts'};
+            pluginLoader.register(pluginDef);
+            expect(() => pluginLoader.register(pluginDef), 'to throw', {
+              code: INVALID_PLUGIN_DEFINITION,
+              pluginDef
+            });
+          });
+        });
+
+        describe('when passed a falsy parameter', function() {
+          it('should throw', function() {
+            expect(() => pluginLoader.register(), 'to throw', {
+              code: INVALID_PLUGIN_DEFINITION
+            });
+          });
+        });
+
+        describe('when passed a non-object parameter', function() {
+          it('should throw', function() {
+            expect(() => pluginLoader.register(1), 'to throw', {
+              code: INVALID_PLUGIN_DEFINITION,
+              pluginDef: 1
+            });
+          });
+        });
+
+        describe('when passed a definition w/o an exportName', function() {
+          it('should throw', function() {
+            const pluginDef = {foo: 'bar'};
+            expect(() => pluginLoader.register(pluginDef), 'to throw', {
+              code: INVALID_PLUGIN_DEFINITION,
+              pluginDef
+            });
           });
         });
       });
+
       describe('load()', function() {
         let pluginLoader;
 
@@ -218,6 +243,7 @@ describe('plugin module', function() {
         let pluginLoader;
         let fooPlugin;
         let barPlugin;
+        let bazPlugin;
 
         beforeEach(function() {
           fooPlugin = {
@@ -232,7 +258,10 @@ describe('plugin module', function() {
             validate: sinon.stub(),
             finalize: impls => impls.map(() => 'BAR')
           };
-          pluginLoader = PluginLoader.create([fooPlugin, barPlugin]);
+          bazPlugin = {
+            exportName: 'baz'
+          };
+          pluginLoader = PluginLoader.create([fooPlugin, barPlugin, bazPlugin]);
         });
 
         describe('when no plugins have been loaded', function() {
@@ -261,32 +290,39 @@ describe('plugin module', function() {
             });
           });
         });
+
+        describe('when a plugin has no "finalize" function', function() {
+          it('should return an array of raw implementations', function() {
+            pluginLoader.load({baz: 'polar bears'});
+            return expect(pluginLoader.finalize(), 'to be fulfilled with', {
+              baz: ['polar bears']
+            });
+          });
+        });
       });
     });
   });
 
   describe('root hoots plugin', function() {
-    /**
-     * @type {import('../../lib/plugin').PluginLoader}
-     */
-    let PluginLoader;
-
     let pluginLoader;
 
     beforeEach(function() {
-      PluginLoader = rewiremock.proxy('../../lib/plugin', {}).PluginLoader;
       pluginLoader = PluginLoader.create();
     });
 
     describe('when impl is an array', function() {
       it('should fail validation', function() {
-        expect(() => pluginLoader.load({mochaHooks: []}), 'to throw');
+        expect(() => pluginLoader.load({mochaHooks: []}), 'to throw', {
+          code: INVALID_PLUGIN_IMPLEMENTATION
+        });
       });
     });
 
     describe('when impl is a primitive', function() {
       it('should fail validation', function() {
-        expect(() => pluginLoader.load({mochaHooks: 'nuts'}), 'to throw');
+        expect(() => pluginLoader.load({mochaHooks: 'nuts'}), 'to throw', {
+          code: INVALID_PLUGIN_IMPLEMENTATION
+        });
       });
     });
 
@@ -346,15 +382,9 @@ describe('plugin module', function() {
   });
 
   describe('global fixtures plugin', function() {
-    /**
-     * @type {import('../../lib/plugin').PluginLoader}
-     */
-    let PluginLoader;
-
     let pluginLoader;
 
     beforeEach(function() {
-      PluginLoader = rewiremock.proxy('../../lib/plugin', {}).PluginLoader;
       pluginLoader = PluginLoader.create();
     });
 
